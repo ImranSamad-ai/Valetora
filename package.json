@@ -1,0 +1,1 @@
+{"name":"valetora","version":"0.1.0","type":"module","private":true,"engines":{"node":">=20"},"scripts":{"start":"node server.js","mcp":"node mcp.js","test":"bash test.sh"}}

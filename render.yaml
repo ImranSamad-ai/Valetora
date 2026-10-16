@@ -1,0 +1,29 @@
+# Render Blueprint: New > Blueprint > pick this repo.
+# FREE plan has no persistent disk and sleeps after 15 idle minutes, so the audit log is kept in Upstash Redis instead
+# (UPSTASH_* vars below). Alternative: a paid plan with the disk block uncommented.
+services:
+  - type: web
+    name: valetora
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    autoDeploy: false
+    # disk:
+    #   name: valetora-data
+    #   mountPath: /data
+    #   sizeGB: 1
+    envVars:
+      - key: MOOVE_API_KEY
+        sync: false            # Render asks you for this when you apply the Blueprint
+      - key: VALETORA_ADMIN_TOKEN
+        generateValue: true    # random; read it in Dashboard > service > Environment
+      - key: VALETORA_AGENT_TOKEN
+        generateValue: true
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false            # from your Upstash database page (REST API section)
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: VALETORA_PUBLIC_DEMO
+        value: "1"
+      - key: VALETORA_RECONCILE_MINUTES
+        value: "10"

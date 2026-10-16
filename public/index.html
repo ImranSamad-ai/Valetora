@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Valetora</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#14171f;--mu:#667085;--bd:#e3e6ec;--ac:#4f46e5;--ok:#12805c;--no:#c0362c;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1118;--card:#171b25;--tx:#eef0f5;--mu:#97a0b3;--bd:#282e3c;--ac:#8b86ff;--ok:#3ecf9a;--no:#ff7b70;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e1118;--card:#171b25;--tx:#eef0f5;--mu:#97a0b3;--bd:#282e3c;--ac:#8b86ff;--ok:#3ecf9a;--no:#ff7b70;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:16px;display:grid;gap:14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px}
+h1{font-size:20px;margin:0}h2{font-size:14px;margin:0 0 10px;text-transform:uppercase;letter-spacing:.05em;color:var(--mu)}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sub{color:var(--mu);font-size:13px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{display:block;font-size:12px;color:var(--mu);margin-bottom:3px}
+input,select{width:100%;padding:9px 10px;border:1px solid var(--bd);border-radius:9px;background:var(--bg);color:var(--tx);font:inherit}
+button{padding:10px 14px;border:0;border-radius:9px;background:var(--ac);color:#fff;font:inherit;font-weight:600;cursor:pointer}
+button.ghost{background:transparent;color:var(--mu);border:1px solid var(--bd)}
+button.pause{background:var(--no)}button.resume{background:var(--ok)}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600}
+.on{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}.off{background:color-mix(in srgb,var(--no) 18%,transparent);color:var(--no)}
+.bar{height:8px;border-radius:9px;background:var(--bd);overflow:hidden;margin:4px 0 10px}.bar i{display:block;height:100%;background:var(--ac)}
+.log{display:grid;gap:8px}.it{border:1px solid var(--bd);border-radius:10px;padding:10px;font-size:13px;word-break:break-word}
+.it b{font-size:14px}.mu{color:var(--mu)}
+pre{margin:0;padding:10px;border-radius:9px;background:var(--bg);overflow-x:auto;font-size:12px}
+.stack{display:grid;gap:10px}
+.err{color:var(--no);font-size:13px;min-height:1em}a{color:var(--ac)}#app{display:none}</style></head><body><main>
+<div class="top"><div><h1>🛡️ Valetora</h1><div class="sub" id="who">Policy-controlled spending for AI agents</div></div><span><span id="st" class="pill on" style="display:none"></span> <button class="ghost" id="out" style="display:none">Sign out</button></span></div>
+<div class="err" id="err"></div>
+
+<section class="card stack" id="login"><h2>Sign in</h2><div class="sub">Enter the owner token (VALETORA_ADMIN_TOKEN). It stays in this tab only.</div>
+<input id="tok" type="password" placeholder="Admin token" autocomplete="off"><button id="in">Sign in</button></section>
+
+<div id="app" style="gap:14px">
+<button id="pz"></button>
+<section class="card stack"><h2>Policy engine</h2>
+<div class="row"><div><label>Daily limit</label><input id="daily" type="number" min="0" step="any"></div><div><label>Weekly limit</label><input id="weekly" type="number" min="0" step="any"></div></div>
+<div class="row"><div><label>Per-link max</label><input id="perTx" type="number" min="0" step="any"></div><div><label>Counterparty rule</label><select id="mode"><option value="any">Any</option><option value="allow">Allow-list only</option></select></div></div>
+<div><label>Allow-list (comma-separated domains)</label><input id="allow" placeholder="vercel.com, openai.com"></div>
+<button id="save">Save policy</button><div class="sub">Amounts are in your Moove settlement token. Settlement token, chain and wallet are managed in your Moove account.</div></section>
+
+<section class="card"><h2>Budget (rolling windows)</h2>
+<div class="sub" id="mDay"></div><div class="bar"><i id="bDay"></i></div>
+<div class="sub" id="mWk"></div><div class="bar"><i id="bWk"></i></div></section>
+
+<section class="card stack"><h2>Test a request</h2>
+<div class="row"><div><label>Counterparty</label><input id="cp" value="vercel.com"></div><div><label>Amount</label><input id="amt" type="number" min="0" step="any" value="5"></div></div>
+<div class="row"><div><label>Type</label><select id="kind"><option value="one-time">One-time</option><option value="multi-use">Multi-use</option></select></div><div><label>Description</label><input id="desc" value="Test link"></div></div>
+<button id="go">Create payment link (real Moove call)</button><div class="sub" id="res"></div></section>
+
+<section class="card"><div class="top"><h2 style="margin:0">Audit log</h2><span><button class="ghost" id="rec">Reconcile</button> <button class="ghost" id="csv">CSV</button></span></div><div class="log" id="log" style="margin-top:10px"></div></section>
+</div></main>
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const m2=n=>(+n).toFixed(2);
+let T='',P=null,B=null,L=[],filled=false;
+try{T=sessionStorage.getItem('as_t')||''}catch(e){}
+function show(){$('login').style.display=T?'none':'grid';$('app').style.display=T?'grid':'none';$('out').style.display=T?'':'none';$('st').style.display=T?'':'none'}
+function signout(){T='';filled=false;try{sessionStorage.removeItem('as_t')}catch(e){}show()}
+async function api(m,p,b){
+ const r=await fetch(p,{method:m,headers:{Authorization:'Bearer '+T,'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});
+ const j=await r.json().catch(()=>({}));
+ if(r.status===401){signout();throw new Error('Wrong or missing token')}
+ if(!r.ok)throw new Error(j.error||'HTTP '+r.status);return j}
+async function refresh(){
+ if(!T)return;
+ try{[P,B,L]=await Promise.all([api('GET','/v1/policy'),api('GET','/v1/budget'),api('GET','/v1/log')]);$('err').textContent='';render()}
+ catch(e){$('err').textContent=e.message}}
+function render(){
+ if(!filled){['daily','weekly','perTx','mode'].forEach(k=>$(k).value=P[k]);$('allow').value=P.allow.join(', ');filled=true}
+ $('st').className='pill '+(P.paused?'off':'on');$('st').textContent=P.paused?'Paused':'Active';
+ $('pz').className=P.paused?'resume':'pause';$('pz').textContent=P.paused?'▶ Resume all agent spending':'⏸ Pause all agent spending';
+ const d=P.daily-B.daily_remaining,w=P.weekly-B.weekly_remaining;
+ $('mDay').textContent='Last 24h: '+m2(d)+' of '+m2(P.daily);$('bDay').style.width=Math.min(100,P.daily?d/P.daily*100:0)+'%';
+ $('mWk').textContent='Last 7 days: '+m2(w)+' of '+m2(P.weekly);$('bWk').style.width=Math.min(100,P.weekly?w/P.weekly*100:0)+'%';
+ const h=L.map(l=>/\/@([^/]+)\/pay\//.exec(l.url||'')).find(Boolean);
+ $('who').textContent=h?'Connected as @'+h[1]:'Policy-controlled spending for AI agents';
+ const col={approved:'ok',pending:'ok',blocked:'no',error:'no'};
+ $('log').innerHTML=L.length?L.slice(0,50).map(l=>`<div class="it"><b style="color:var(--${col[l.status]||'mu'})">${esc(l.status.toUpperCase())}</b> · ${esc(l.amount)} · ${esc(l.counterparty||'—')}
+<div class="mu">${esc(l.agent)} · ${esc(l.kind)} · ${new Date(l.ts).toLocaleString()}</div>
+<div class="mu">Policy: ${esc(l.policy)}${l.reason?' — '+esc(l.reason):''}${l.mooveStatus?' · Moove: '+esc(l.mooveStatus)+(l.receivedAmount?' ('+esc(l.receivedAmount)+' received)':''):''}</div>
+${/^https:\/\//.test(l.url||'')?`<div><a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.url)}</a></div>`:''}</div>`).join(''):'<div class="sub">No requests yet.</div>'}
+async function act(fn){try{await fn();await refresh()}catch(e){$('err').textContent=e.message}}
+$('in').onclick=()=>{T=$('tok').value.trim();try{sessionStorage.setItem('as_t',T)}catch(e){}$('tok').value='';show();refresh()};
+$('out').onclick=signout;
+$('pz').onclick=()=>act(()=>api('POST',P.paused?'/v1/resume':'/v1/pause'));
+$('save').onclick=()=>act(async()=>{P=await api('PUT','/v1/policy',{daily:+$('daily').value,weekly:+$('weekly').value,perTx:+$('perTx').value,mode:$('mode').value,allow:$('allow').value.split(',')});filled=false});
+$('go').onclick=()=>act(async()=>{$('res').textContent='Working…';const r=await api('POST','/v1/links',{agent:'dashboard',counterparty:$('cp').value,amount:$('amt').value,kind:$('kind').value,description:$('desc').value});
+ $('res').style.color=r.ok?'var(--ok)':'var(--no)';$('res').textContent=r.ok?'Approved → '+r.url:'Blocked: '+r.reason});
+$('rec').onclick=()=>act(async()=>{const r=await api('POST','/v1/reconcile');$('res').style.color='var(--mu)';$('res').textContent='Reconciled '+r.updated+' links'});
+$('csv').onclick=()=>{const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+ const t=['time,agent,counterparty,amount,type,status,policy,reason,url,moove_status',...L.map(l=>[new Date(l.ts).toISOString(),l.agent,l.counterparty,l.amount,l.kind,l.status,l.policy,l.reason,l.url,l.mooveStatus].map(q).join(','))].join('\n');
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type:'text/csv'}));a.download='valetora-audit.csv';a.click()};
+show();refresh();setInterval(refresh,10000);
+</script></body></html>

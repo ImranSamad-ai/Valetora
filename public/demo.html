@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Valetora</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#14171f;--mu:#667085;--bd:#e3e6ec;--ac:#4f46e5;--ok:#12805c;--no:#c0362c;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1118;--card:#171b25;--tx:#eef0f5;--mu:#97a0b3;--bd:#282e3c;--ac:#8b86ff;--ok:#3ecf9a;--no:#ff7b70;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e1118;--card:#171b25;--tx:#eef0f5;--mu:#97a0b3;--bd:#282e3c;--ac:#8b86ff;--ok:#3ecf9a;--no:#ff7b70;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:720px;margin:0 auto;padding:16px;display:grid;gap:14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px}
+h1{font-size:20px;margin:0}h2{font-size:14px;margin:0 0 10px;text-transform:uppercase;letter-spacing:.05em;color:var(--mu)}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sub{color:var(--mu);font-size:13px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{display:block;font-size:12px;color:var(--mu);margin-bottom:3px}
+input,select{width:100%;padding:9px 10px;border:1px solid var(--bd);border-radius:9px;background:var(--bg);color:var(--tx);font:inherit}
+button{padding:10px 14px;border:0;border-radius:9px;background:var(--ac);color:#fff;font:inherit;font-weight:600;cursor:pointer}
+button.ghost{background:transparent;color:var(--mu);border:1px solid var(--bd)}
+button.pause{background:var(--no)}button.resume{background:var(--ok)}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600}
+.on{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}.off{background:color-mix(in srgb,var(--no) 18%,transparent);color:var(--no)}
+.bar{height:8px;border-radius:9px;background:var(--bd);overflow:hidden;margin:4px 0 10px}.bar i{display:block;height:100%;background:var(--ac)}
+.log{display:grid;gap:8px}.it{border:1px solid var(--bd);border-radius:10px;padding:10px;font-size:13px;word-break:break-word}
+.it b{font-size:14px}.mu{color:var(--mu)}
+pre{margin:0;padding:10px;border-radius:9px;background:var(--bg);overflow-x:auto;font-size:12px}
+.stack{display:grid;gap:10px}
+.err{color:var(--no);font-size:13px;min-height:1em}a{color:var(--ac)}#app{display:none}.ban{border-color:var(--ac)}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}.stats b{display:block;font-size:20px}</style></head><body><main>
+<div class="top"><div><h1>🛡️ Valetora</h1><div class="sub">Live, read-only demo</div></div><span id="st" class="pill on">Active</span></div>
+<div class="card ban"><div class="sub">You are viewing a live system. Entries below are real payment links created by agents under the policy shown. You cannot change anything here. The simulator only asks the policy engine "would this be allowed?" and creates nothing.</div></div>
+<div class="err" id="err"></div>
+<section class="card stats"><div><b id="s1">–</b><span class="sub">links created</span></div><div><b id="s2">–</b><span class="sub">paid</span></div><div><b id="s3">–</b><span class="sub">blocked</span></div><div><b id="s4">–</b><span class="sub">agents</span></div></section>
+<section class="card"><h2>Active policy</h2><div id="pol" class="sub"></div></section>
+<section class="card"><h2>Budget (rolling windows)</h2><div class="sub" id="mDay"></div><div class="bar"><i id="bDay"></i></div><div class="sub" id="mWk"></div><div class="bar"><i id="bWk"></i></div></section>
+<section class="card stack"><h2>Try the policy engine</h2>
+<div class="row"><div><label>Counterparty</label><input id="cp" value="vercel.com"></div><div><label>Amount</label><input id="amt" type="number" min="0" step="any" value="5"></div></div>
+<button id="go">Simulate request</button><div class="sub" id="res"></div></section>
+<section class="card"><h2>Audit log</h2><div class="log" id="log"></div></section>
+</main><script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const m2=n=>(+n).toFixed(2);
+async function refresh(){
+ try{const r=await fetch('/public/state');if(!r.ok)throw new Error('Demo unavailable');const s=await r.json(),p=s.policy,b=s.budget;$('err').textContent='';
+  $('st').className='pill '+(p.paused?'off':'on');$('st').textContent=p.paused?'Paused':'Active';
+  $('s1').textContent=s.stats.links_created;$('s2').textContent=s.stats.links_paid;$('s3').textContent=s.stats.blocked;$('s4').textContent=s.stats.agents;
+  $('pol').textContent='Daily '+m2(p.daily)+' · Weekly '+m2(p.weekly)+' · Max per link '+m2(p.perTx)+' · '+(p.mode==='allow'?'Allow-list: '+(p.allow.join(', ')||'(empty)'):'Any counterparty');
+  const d=p.daily-b.daily_remaining,w=p.weekly-b.weekly_remaining;
+  $('mDay').textContent='Last 24h: '+m2(d)+' of '+m2(p.daily);$('bDay').style.width=Math.min(100,p.daily?d/p.daily*100:0)+'%';
+  $('mWk').textContent='Last 7 days: '+m2(w)+' of '+m2(p.weekly);$('bWk').style.width=Math.min(100,p.weekly?w/p.weekly*100:0)+'%';
+  const col={approved:'ok',pending:'ok',blocked:'no',error:'no'};
+  $('log').innerHTML=s.log.length?s.log.map(l=>`<div class="it"><b style="color:var(--${col[l.status]||'mu'})">${esc(l.status.toUpperCase())}</b> · ${esc(l.amount)} · ${esc(l.counterparty||'—')}
+<div class="mu">${esc(l.agent)} · ${esc(l.kind)} · ${new Date(l.ts).toLocaleString()}</div>
+<div class="mu">Policy: ${esc(l.policy)}${l.reason?' — '+esc(l.reason):''}${l.mooveStatus?' · Moove: '+esc(l.mooveStatus)+(l.receivedAmount?' ('+esc(l.receivedAmount)+' received)':''):''}</div>
+${/^https:\/\//.test(l.url||'')?`<div><a href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.url)}</a></div>`:''}</div>`).join(''):'<div class="sub">No requests yet.</div>'}
+ catch(e){$('err').textContent=e.message}}
+$('go').onclick=async()=>{try{const r=await fetch('/public/simulate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({counterparty:$('cp').value,amount:$('amt').value})});const j=await r.json();
+ $('res').style.color=j.ok?'var(--ok)':'var(--no)';$('res').textContent=r.ok?(j.ok?'Would be approved (simulated, nothing created)':'Would be blocked: '+j.reason):(j.error||'Error')}catch(e){$('res').textContent=e.message}};
+refresh();setInterval(refresh,10000);
+</script></body></html>
